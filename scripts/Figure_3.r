@@ -4,76 +4,45 @@
 
 library(tidyverse)
 
-# calculo correlaciones
-tendencias = read.csv("results/fenofases.txt", sep="") %>%
-  pivot_longer(cols=c(st.jd, en.jd, sm.ps), names_to='fenofase') %>%
-  group_by(type, site, method, fenofase) %>%
-  summarise({
-    if (sum(!is.na(value) & !is.na(seasons)) > 2) {
-      test <- cor.test(value, seasons, method = "spearman")
-      data.frame(
-        rho = unname(test$estimate),
-        p.val = test$p.value
-      )
-    } else {
-      data.frame(rho = NA, p.val = NA)
-    }
-  }, .groups = "drop") %>%
-  na.omit()
 
-# añadIr significacion
-tendencias$sig <- ifelse(tendencias$p.val < 0.05, "sig.", "non sig.")
+# parametros por estacion y type
+parametros = read.csv("results/parametros.txt", sep="") %>%
+  dplyr::select(-en.jd, -sm.ps, pk.val, -pk.jd, -daysth, -pk.val)
+colnames(parametros)[colnames(parametros)=='seasons'] = 'year'
 
-# ordeno parametros
-tendencias$fenofase <- factor(tendencias$fenofase, levels=c("st.jd", "en.jd", "sm.ps"))
 
-# plot
-ggplot(aes(x=fenofase, y=rho, group=fenofase, colour=sig, shape=method), data=tendencias) +
-  geom_boxplot() +
-  geom_jitter(width=0.2, alpha=0.7, size=1.2) +
-  labs(x=NULL, y="Spearman ρ") +
-  geom_hline(yintercept = 0) +
-  facet_wrap(~type, scales='free_y', nrow=1) +
+# scatter plot de valores promedio
+annual_pollen_summary2 <- parametros %>%
+  group_by(site, type) %>%
+  summarise(
+    SOP_m = median(st.jd, na.rm = TRUE),
+    SOP_d = mad(st.jd, na.rm = TRUE),
+    LOP_m = median(ln.ps, na.rm = TRUE),
+    LOP_d = mad(ln.ps, na.rm = TRUE),
+    APIn_m = median(sm.tt, na.rm = TRUE),
+    APIn_d = mad(sm.tt, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(cols = 3:8, names_to = "name", values_to = "value") %>%
+  mutate(
+    parameter = sub("_(m|d)$", "", name),
+    summary = ifelse(grepl("_m$", name), "median", "mad"),
+    name=NULL
+  ) %>%
+  pivot_wider(names_from = summary, values_from = value)
+
+annual_pollen_summary2$parameter = factor(annual_pollen_summary2$parameter, levels=c('SOP','LOP','APIn'))
+
+ggplot(aes(x=site, y=median, color=type, shape=type, group=type), data=annual_pollen_summary2) +
+  geom_point(position=position_dodge(width = 0.7), size=1.3) +
+  geom_errorbar(
+    aes(ymin = ifelse(parameter == "APIn", pmin(median - mad, 2000), median - mad),
+        ymax = ifelse(parameter == "APIn", pmin(median + mad, 2000), median + mad)),
+                position=position_dodge(width = 0.7), linewidth = 0.3, width = 0.3) +
+  facet_wrap(~parameter, scales='free_y') +
   theme_bw() +
-  theme(legend.position='bottom')
-
-# tabla
-table(tendencias$sig, tendencias$fenofase, tendencias$type)
-
-
-# # plot: ver diferencias entre sitios
-# ggplot(aes(x=site, y=rho, colour=sig, group=type),
-#        data=tendencias[tendencias$fenofase=='sm.ps',]) +
-#   geom_boxplot() +
-#   geom_jitter(width=0.2, alpha=0.7, size=1.2) +
-#   labs(title = "Tendencias interanuales de parametros fenologicos", x=NULL, y="Spearman's ρ") +
-#   geom_hline(yintercept = 0) +
-#   # facet_wrap(~site, scales='free_y', nrow=11) +
-#   theme_bw() +
-#   theme(legend.position='bottom')
-
-
-
-# Cuantificar aumento de sm.sp en PLAN y URTI
-
-temp = read.csv("results/fenofases.txt", sep="")  %>%
-  subset(type %in% c('PLAN','URTI')) %>%
-  dplyr::select(type, site, method, seasons, sm.ps) %>%
-  mutate(period = if_else(seasons < 2005, "first", "second")) %>%
-  group_by(type, site, method, period) %>%
-  summarise(median_api=median(sm.ps, na.rm=T),
-            mad_api=mad(sm.ps, na.rm=T))
-
-ggplot(aes(x=period, y=median_api, group=interaction(site,method), color=site, shape=method),
-       data=temp) +
-  geom_jitter(width=0.1, alpha=0.7, size=1.2) +
-  geom_line() +
-  labs(x='Period', y='Median APIn') +
-  facet_wrap(~type, scales='free_y') +
-  theme_bw() +
-  theme(legend.position='bottom') +
-  guides(color=guide_legend(nrow=3, byrow=TRUE),
-         shape=guide_legend(nrow=3, byrow=TRUE))
-  
+  theme(legend.position='top',
+        axis.title.x = element_blank(),
+        axis.text.x=element_text(angle=45, hjust=1, size=8))
 
 

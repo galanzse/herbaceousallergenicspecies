@@ -95,8 +95,8 @@ for (i in 1:nrow(combn)) {
 
 # colapso la lista
 parametros = do.call(rbind, parametros) %>% as.data.frame()
-# para ARTE nos quedamos con polen total y picos
-parametros[parametros$type=='ARTE', which(colnames(parametros)%in%c('st.jd', 'en.jd', 'ln.ps'))] <- NA
+# # para ARTE nos quedamos con polen total y picos
+# parametros[parametros$type=='ARTE', which(colnames(parametros)%in%c('st.jd', 'en.jd', 'ln.ps'))] <- NA
 # # guardo
 # write.table(parametros, file = "results/parametros.txt")
 

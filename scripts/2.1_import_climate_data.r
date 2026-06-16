@@ -3,7 +3,7 @@
 # Importamos datos de clima
 
 
-source('scripts/0.1_estaciones.r')
+source('scripts/0.1_pollen_stations.r')
 
 
 # datos de estaciones AEMET de Madrid
@@ -60,6 +60,7 @@ climate_data$dir <- climate_data$dir * 10
 
 # parece que los datos están bien
 boxplot(climate_data[,c('tmed', 'prec', 'tmin', 'tmax', 'velmedia', 'dir')])
+cor.test(climate_data$tmed, climate_data$tmin, use="pairwise.complete.obs", method="spearman")
 
 
 
@@ -157,8 +158,7 @@ duplicados <- climate_data_summary %>%
   filter(site %in% c("ALCA", "GETA","AYTM")) %>%
   mutate(site = case_when(
     site == "ALCA" ~ "COSL",
-    site == "GETA" ~ "LEGA",
-    site == "AYTM" ~ "ALER"
+    site == "GETA" ~ "LEGA"
   ))
 
 # unimos
@@ -167,4 +167,5 @@ climate_data_summary <- bind_rows(climate_data_summary, duplicados)
 
 # # guardamos
 # write.table(climate_data_summary, 'results/climate_data_summary.txt')
+
 

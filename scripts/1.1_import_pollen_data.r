@@ -22,6 +22,9 @@ pollen_data <- lapply(pollen_data, read.csv2)
 pollen_data <- do.call(rbind, pollen_data)
 table(is.na(pollen_data$granos_de_polen_x_metro_cubico))
 
+# me cargo Subiza
+pollen_data = pollen_data[pollen_data$captador!='ALER',]
+
 # check variables
 str(pollen_data)
 
@@ -37,8 +40,18 @@ pollen_data$year <- year(pollen_data$date)
 pollen_data = pollen_data[pollen_data$type %in% c("Artemisia", "Plantago", "Quenopodi?ceas/Amarant?ceas", "Quenopodi\xe1ceas/Amarant\xe1ceas", "Rumex (Acederas)", "Urticaceae (Ortigas)"),]
 
 # correct factor
-pollen_data$type <- as.factor(pollen_data$type)
-levels(pollen_data$type) <- c("ARTE", "PLAN", "AMAR", "AMAR", "RUME", "URTI")
+pollen_data <- pollen_data %>%
+  mutate(
+    type = recode(
+      type,
+      "Artemisia" = "ARTE",
+      "Plantago" = "PLAN",
+      "Quenopodi?ceas/Amarant?ceas" = "AMAR",
+      "Quenopodi\xe1ceas/Amarant\xe1ceas" = "AMAR",
+      "Rumex (Acederas)" = "RUME",
+      "Urticaceae (Ortigas)" = "URTI"
+    )
+  )
 
 
 
@@ -58,7 +71,7 @@ monthly_quality <- pollen_data %>%
     coverage_pct = round((n_days_recorded / days_in_month) * 100, 1),
     .groups = 'drop'
   ) %>%
-  select(-month_start)
+  dplyr::select(-month_start)
 
 # histograma de porcentaje de dias que no son NA por mes
 hist(monthly_quality$coverage_pct)

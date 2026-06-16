@@ -1,16 +1,10 @@
-
-
-# Cruzamos la base de datos de polen con la de clima
-
-
-library(tidyverse)
-
+# MS ####
 
 # datos de clima
 climate <- read.csv("results/clima_data_summary.txt", sep="") %>%
   mutate(year = season_year) %>% 
-  dplyr::select(site, year, season, prec_t, tmed_m) %>%
-  pivot_longer(cols=c(prec_t, tmed_m),
+  dplyr::select(site, year, season, tmin_m, tmax_m) %>%
+  pivot_longer(cols=c(tmin_m, tmax_m),
                names_to='meteo_sum', values_to='meteoval')
 str(climate)
 climate$site <- as.factor(climate$site)
@@ -27,8 +21,7 @@ colnames(fenofases)[colnames(fenofases)=='seasons'] = 'year'
 climatexpollen <- merge(climate, fenofases, by=c('site','year'))
 
 # eliminamos temperaturas acumuladas
-climatexpollen <- climatexpollen[climatexpollen$meteo_sum %in% c('prec_t','tmed_m'),]
-
+climatexpollen <- climatexpollen[climatexpollen$meteo_sum %in% c('tmin_m', 'tmax_m'),]
 
 # calculamos tendencias
 climate_trends = climatexpollen %>%
@@ -67,38 +60,22 @@ climate_trends$rho[climate_trends$season=='SON' & climate_trends$fenofase=='SOP'
 climate_trends$rho[climate_trends$season=='JJA' & climate_trends$fenofase=='SOP'] <- NA
 climate_trends = climate_trends %>% subset(climate_trends$season!='SON')
 
-# plots
 ggplot(aes(x=fenofase, y=rho, group=fenofase, colour=sig, shape=method),
-       data=climate_trends[climate_trends$meteo_sum=='tmed_m',]) +
+       data=climate_trends[climate_trends$meteo_sum=='tmin_m',]) +
   geom_boxplot() +
   geom_jitter(width=0.2, alpha=0.7, size=1.2) +
   geom_hline(yintercept=0) +
-  facet_grid(season ~ type, scales = "free_x") +
-  labs(title='Seasonal daily mean temperature', y="Spearman's ρ", x=NULL) +
+  facet_wrap(~season+type, scales='free_x', nrow=3) +
+  labs(title='Seasonal average minimum temperature', y='Spearman ρ', x=NULL) +
   theme_bw() +
-  theme(legend.position='bottom') +
-  guides(
-    colour = guide_legend(nrow = 2),
-    shape  = guide_legend(nrow = 2)
-  )
+  theme(legend.position='bottom')
 
 ggplot(aes(x=fenofase, y=rho, group=fenofase, colour=sig, shape=method),
-       data=climate_trends[climate_trends$meteo_sum=='prec_t',]) +
+       data=climate_trends[climate_trends$meteo_sum=='tmax_m',]) +
   geom_boxplot() +
   geom_jitter(width=0.2, alpha=0.7, size=1.2) +
   geom_hline(yintercept=0) +
-  facet_grid(season ~ type, scales = "free_x") +
-  labs(title='Seasonal accumulated precipitation', y='Spearman ρ', x=NULL) +
+  facet_wrap(~season+type, scales='free_x', nrow=3) +
+  labs(title='Seasonal average maximum temperature', y='Spearman ρ', x=NULL) +
   theme_bw() +
-  theme(legend.position='bottom') +
-  guides(
-    colour = guide_legend(nrow = 2),
-    shape  = guide_legend(nrow = 2)
-  )
-
-
-# tabla
-temp = climate_trends[climate_trends$season=='DJF' & climate_trends$type=='URTI',]
-table(temp$sig, temp$fenofase, temp$meteo_sum)
-
-
+  theme(legend.position='bottom')

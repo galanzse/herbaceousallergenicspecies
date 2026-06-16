@@ -33,9 +33,9 @@ legend("bottomleft", inset = c(0, 0),
        pch = 19, bty = "n")
 
 
-# continuamos con st.jd, en.jd, sm.ps
+# continuamos con st.jd, ln.ps, sm.tt
 parametros = read.csv("results/parametros.txt", sep="") %>%
-  dplyr::select(type, site, method, seasons, st.jd, en.jd, sm.ps)
+  dplyr::select(type, site, method, seasons, st.jd, ln.ps, sm.tt)
 
 
 
@@ -43,19 +43,19 @@ parametros = read.csv("results/parametros.txt", sep="") %>%
 
 # calculamos el polen total (integral) por estacion y type
 annual_pollen_summary <- read.csv("results/parametros.txt", sep="") %>%
-  dplyr::select(type, site, method, seasons, st.jd, en.jd, sm.ps) %>%
-  pivot_longer(cols=c(st.jd, en.jd, sm.ps), names_to='parameter', values_to='value')
+  dplyr::select(type, site, method, seasons, st.jd, ln.ps, sm.tt) %>%
+  pivot_longer(cols=c(st.jd, ln.ps, sm.tt), names_to='parameter', values_to='value')
 colnames(annual_pollen_summary)[colnames(annual_pollen_summary)=='seasons'] = 'year'
 
 # los diferentes metodos dan diferentes integrales pero tienen relaciones lineares perfectas
 annual_pollen_summary %>%
-  subset(parameter=='sm.ps') %>%
+  subset(parameter=='sm.tt') %>%
   pivot_wider(names_from=method, values_from=value) %>%
   dplyr::select(percentage, moving, grains, clinical, logistic) %>%
   pairs()
 
 # APIn de URTI y PLAN muestran tendencias al alza desde 2010
-annual_pollen_summary$parameter = factor(annual_pollen_summary$parameter, levels=c("st.jd","en.jd","sm.ps"))
+annual_pollen_summary$parameter = factor(annual_pollen_summary$parameter, levels=c("st.jd","ln.ps","sm.tt"))
 annual_pollen_summary = annual_pollen_summary %>% na.omit() %>% subset(value<8000)
 ggplot(aes(x=year, y=value, group=site, color=site),
        data=annual_pollen_summary[annual_pollen_summary$method=='percentage',]) +
@@ -73,7 +73,7 @@ ggplot(aes(x=year, y=value, group=site, color=site),
 
 # IMPORTANCIA DEL METODO ####
 
-# comparacion entre metodos para st.jd, en.jd, sm.ps
+# comparacion entre metodos para st.jd, ln.ps, sm.tt
 temp <- parametros %>% dplyr::select(type, site, method, seasons, st.jd) %>%
   pivot_wider(names_from=method, values_from=st.jd)
 temp$type = as.factor(temp$type)
@@ -89,7 +89,7 @@ legend("bottomleft",
 
 # long
 parametros_long <- parametros %>% pivot_longer(5:7, names_to='fenofase', values_to='value')
-parametros_long$fenofase <- factor(parametros_long$fenofase, levels=c("st.jd", "en.jd", "sm.ps"))
+parametros_long$fenofase <- factor(parametros_long$fenofase, levels=c("st.jd", "ln.ps", "sm.tt"))
 
 # diferencias entre tipos y estaciones
 ggplot(aes(x=type, y=value, fill=type), data=parametros_long) +
@@ -111,21 +111,21 @@ ggplot(aes(x=method, y=value, fill=method), data=parametros_long) +
 # PARAMETROS POR ESTACION Y TIPO POLINICO ####
 
 parametros = read.csv("results/parametros.txt", sep="") %>%
-  dplyr::select(-ln.ps, -sm.tt, pk.val, -pk.jd, -daysth, -pk.val)
+  dplyr::select(-en.jd, -sm.ps, pk.val, -pk.jd, -daysth, -pk.val)
 colnames(parametros)[colnames(parametros)=='seasons'] = 'year'
 
 annual_pollen_summary <- parametros %>%
   group_by(site, type, year) %>%
   summarise(
     st.jd = median(st.jd, na.rm=T),
-    en.jd = median(en.jd, na.rm=T),
-    sm.ps = median(sm.ps, na.rm=T)
+    ln.ps = median(ln.ps, na.rm=T),
+    sm.tt = median(sm.tt, na.rm=T)
   ) %>%
-  pivot_longer(cols=c(st.jd, en.jd, sm.ps), names_to='parameter')
+  pivot_longer(cols=c(st.jd, ln.ps, sm.tt), names_to='parameter')
 
 annual_pollen_summary = annual_pollen_summary %>% na.omit() %>% subset(value<3000)
 
-annual_pollen_summary$parameter = factor(annual_pollen_summary$parameter, levels=c("st.jd","en.jd","sm.ps"))
+annual_pollen_summary$parameter = factor(annual_pollen_summary$parameter, levels=c("st.jd","ln.ps","sm.tt"))
 
 # exploramos diferencias entre estaciones 1
 ggplot(aes(x=type, y=value, fill=type),
