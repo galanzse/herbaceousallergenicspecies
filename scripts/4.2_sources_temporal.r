@@ -8,185 +8,147 @@ library(terra)
 library(readxl)
 library(vegan)
 library(landscapemetrics)
-library(lme4)
+# library(lme4)
 
 
 source('scripts/0.1_pollen_stations.r')
-source('scripts/0.1_pollen_stations.r')
+source('scripts/4.0_CLC reclassification.r')
 
 
-# eliminamos estas categorias de usos de suelo porque menos del 60% de las celdas cambian para todos los cambios de periodo c('agricultural mosaic', 'broadleaved forests', 'coniferous forest', 'mixed forests', 'shrubland', 'tree crops')
-# si las tenemos en cuenta con el tercer sistema de reclasificacion
 
-
-# POLEN and CLIMATE DATA ####
+# POLLEN DATA ####
 
 pollen = read.csv("results/parametros.txt", sep="") %>%
-  dplyr::select(type, site, method, seasons, sm.ps) %>%
+  dplyr::select(type, site, method, seasons, sm.tt) %>%
   subset(method=='percentage') %>%
   select(-method)
-colnames(pollen)[colnames(pollen)=='seasons'] = 'año'
+colnames(pollen)[colnames(pollen)=='seasons'] = 'year'
 
-climate <- read.csv("results/climate_data_summary.txt", sep="")
+ventanas <- tibble(
+  year = c(2000, 2006, 2012, 2018)) %>%
+  mutate(years_mean = purrr::map(year, ~ .x + c(-1, 0, 1)))
 
-
-# PREPARAMOS DF DE INCREMENTOS ####
-
-# POLLEN CHANGES
-pol_changes = expand_grid(site = unique(pollen$site),
-                         año1 = c(2000, 2006, 2012, 2018),
-                         año2 = c(2000, 2006, 2012, 2018),
-                         type = unique(pollen$type))
-
-# cuantificamos cambios de un periodo al siguiente
-pol_changes = pol_changes[pol_changes$año2 > pol_changes$año1,]
-pol_changes$Δ_años = pol_changes$año2 - pol_changes$año1
-pol_changes <- pol_changes[pol_changes$Δ_años <= 6,]
-pol_changes$Δ_años = NULL
-
-# polen
-pol_changes$Δ_polen = NA
-
-# loop
-for (i in 1:nrow(pol_changes)) {
-  
-  p1 = pollen %>%
-    dplyr::filter(site == pol_changes$site[i],
-                  type == pol_changes$type[i],
-                  # hago la mediana de 3 años
-                  año %in% (pol_changes$año1[i] + c(-1, 0, 1))) %>%
-    dplyr::pull(sm.ps) %>% median(na.rm = TRUE)
-  p2 = pollen %>%
-    dplyr::filter(site == pol_changes$site[i],
-                  type == pol_changes$type[i],
-                  año %in% (pol_changes$año2[i] + c(-1, 0, 1))) %>%
-    dplyr::pull(sm.ps) %>% median(na.rm = TRUE)
-  
-  pol_changes$Δ_polen[i] = p2 - p1
-
-  # progress
-  print(paste(round(i/nrow(pol_changes),4)*100, '%'))
-  
-}
-
-# # save
-# write.table(pol_changes, 'results/pol_changes.txt')
+pollen_clc <- map_dfr(seq_len(nrow(ventanas)), function(i){
+  yr <- ventanas$year[i]
+  pollen %>%
+    filter(year %in% ventanas$years_mean[[i]]) %>%
+    group_by(site, type) %>%
+    summarise(
+      av_APIn = mean(sm.tt, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(year = yr)
+})
 
 
 
-# LAND USE CHANGES
-lu_changes = expand_grid(site = unique(pollen$site),
-                         año1 = c(2000, 2006, 2012, 2018),
-                         año2 = c(2000, 2006, 2012, 2018))
+# LAND USES ####
 
-# cuantificamos cambios de un periodo al siguiente
-lu_changes = lu_changes[lu_changes$año2 > lu_changes$año1,]
-lu_changes$Δ_años = lu_changes$año2 - lu_changes$año1
-lu_changes <- lu_changes[lu_changes$Δ_años <= 6,]
-lu_changes$Δ_años = NULL
-
-
-# CORINE reclassified 1: CORINErecl
 # class metrics
-lu_changes$Δ_urban = NA
-lu_changes$Δ_nonirrigated_arable_land = NA
-lu_changes$Δ_permanently_irrigated_land = NA
-lu_changes$Δ_permanent_crops = NA
-lu_changes$Δ_pastures = NA
-lu_changes$Δ_agricultural_mosaic = NA
-lu_changes$Δ_forests = NA
-lu_changes$Δ_natural_grasslands = NA
-lu_changes$Δ_shrubland = NA
-lu_changes$Δ_sclerophyllous_forests = NA
+pollen_clc$urban = NA
+pollen_clc$nonirrigated_arable_land = NA
+pollen_clc$permanently_irrigated_land = NA
+pollen_clc$permanent_crops = NA
+pollen_clc$pastures = NA
+pollen_clc$agricultural_mosaic = NA
+pollen_clc$forests = NA
+pollen_clc$natural_grasslands = NA
+pollen_clc$shrubland = NA
+pollen_clc$sclerophyllous_forests = NA
 
-# landscape metrics
-lu_changes$Δ_ed = NA
-lu_changes$Δ_pd = NA
-lu_changes$Δ_shdi = NA
+# Landscape metrics
+pollen_clc$ed <- NA
+pollen_clc$pd <- NA
+pollen_clc$shdi <- NA
 
 # loop
-for (i in 1:nrow(lu_changes)) {
-
+for (i in 1:nrow(pollen_clc)) {
+  
   # sitio + buffer 10km
-  st = v_pollen_stations[v_pollen_stations$codigo==lu_changes$site[i],] %>%
+  st = v_pollen_stations[v_pollen_stations$codigo==pollen_clc$site[i],] %>%
     project(crs(CORINErecl)) %>% buffer(10000)
   
   # recorto CLC
   clcxst = CORINErecl %>% terra::crop(st, mask=T)
-
+  clcxst = clcxst[[grep(pollen_clc$year[i], names(clcxst))]]
+  
+  # areas
+  classes = levels(clcxst)[[1]]; colnames(classes) = c('class', 'name')
+  areas = merge(lsm_c_ca(clcxst)[,c('class','value')], classes, all=T)
+  
   # CORINErecl
-  lu_changes$Δ_urban[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[1] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[1]
-  lu_changes$Δ_nonirrigated_arable_land[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[2] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[2]
-  lu_changes$Δ_permanently_irrigated_land[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[3] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[3]
-  lu_changes$Δ_permanent_crops[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[4] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[4]
-  lu_changes$Δ_pastures[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[5] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[5]
-  lu_changes$Δ_agricultural_mosaic[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[6] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[6]
-  lu_changes$Δ_forests[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[7] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[7]
-  lu_changes$Δ_natural_grasslands[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[8] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[8]
-  lu_changes$Δ_shrubland[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[9] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[9]
-  lu_changes$Δ_sclerophyllous_forests[i] = lsm_c_ca(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value[10] - lsm_c_ca(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value[10]
+  pollen_clc$urban[i] = areas$value[areas$name=='urban']
+  pollen_clc$nonirrigated_arable_land[i] = areas$value[areas$name=='nonirrigated arable land']
+  pollen_clc$permanently_irrigated_land[i] =areas$value[areas$name=='permanently irrigated land']
+  pollen_clc$permanent_crops[i] = areas$value[areas$name=='permanent crops']
+  pollen_clc$pastures[i] = areas$value[areas$name=='pastures']
+  pollen_clc$agricultural_mosaic[i] = areas$value[areas$name=='agricultural mosaic']
+  pollen_clc$forests[i] = areas$value[areas$name=='forests']
+  pollen_clc$natural_grasslands[i] = areas$value[areas$name=='natural grasslands']
+  pollen_clc$shrubland[i] = areas$value[areas$name=='shrubland']
+  pollen_clc$sclerophyllous_forests[i] = areas$value[areas$name=='sclerophyllous forests']
 
-  lu_changes$Δ_ed[i] = lsm_l_ed(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value - lsm_l_ed(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value
-  lu_changes$Δ_pd[i] = lsm_l_pd(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value - lsm_l_pd(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value
-  lu_changes$Δ_shdi[i] = lsm_l_shdi(clcxst[[grep(lu_changes$año2[i], names(clcxst))]])$value - lsm_l_shdi(clcxst[[grep(lu_changes$año1[i], names(clcxst))]])$value
+  # landscape
+  pollen_clc$ed[i]   <- lsm_l_ed(clcxst)$value
+  pollen_clc$pd[i]   <- lsm_l_pd(clcxst)$value
+  pollen_clc$shdi[i] <- lsm_l_shdi(clcxst)$value
   
   # progress
-  print(paste(round(i/nrow(lu_changes),4)*100, '%'))
+  print(paste(round(i/nrow(pollen_clc),4)*100, '%'))
   
 }
 
-# # save
-# write.table(lu_changes, 'results/lu_changes.txt')
+# NAs to 0
+pollen_clc[,5:14][is.na(pollen_clc[,5:14])] = 0
 
-
+# number of 0s per variable
+colSums(pollen_clc[, 5:14] == 0, na.rm = TRUE)/nrow(pollen_clc)*100
 
 
 # SELECCIONAMOS LAS VARIABLES ####
 
-# juntamos los df de tendencias de polen y predictores
-Δ_df = merge(pol_changes, lu_changes, by=c('site','año1','año2'))
+land_vars <- c("urban", "nonirrigated_arable_land", "permanently_irrigated_land", "permanent_crops", "pastures",         "agricultural_mosaic", "forests", "natural_grasslands", "shrubland", "sclerophyllous_forests", "ed", "pd", "shdi")
 
-# reordeno variables
-Δ_df = Δ_df[,c("site", "type", "Δ_polen",
-               # "Δ_temp_DJF", "Δ_temp_MAM", "Δ_temp_JJA", "Δ_temp_SON",
-               "Δ_urban", "Δ_nonirrigated_arable_land", "Δ_permanently_irrigated_land", "Δ_permanent_crops", 
-               "Δ_pastures", "Δ_agricultural_mosaic", "Δ_forests", "Δ_natural_grasslands", "Δ_shrubland",
-               "Δ_sclerophyllous_forests",
-               "Δ_ed", "Δ_pd", "Δ_shdi")]
+pollen_change <- pollen_clc %>%
+  arrange(site, type, year) %>%
+  group_by(site, type) %>%
+  mutate(
+    period = paste(lag(year), year, sep = "-"),
+    d_polen = (av_APIn - lag(av_APIn))
+  ) %>%
+  mutate(
+    across(
+      all_of(land_vars),
+      ~ (.x - lag(.x)), .names = "{.col}"
+    )
+  ) %>%
+  filter(!is.na(period))
 
-# echamos un ojo 
-pairs(log1p(abs(Δ_df[,4:16])), lower.panel=NULL)
-corr = cor(Δ_df[,4:16], use='pairwise.complete.obs') %>% round(2)
-corr[upper.tri(corr)] <- NA
-round(corr, 2)
+# retenemos cambios relevantes
+pollen_change = pollen_change[-which(pollen_change$year==2000),-which(colnames(pollen_change)%in%c("av_APIn","year"))]
 
+# order
+pollen_change = pollen_change[,c("site", "type", "period", "d_polen", "shrubland", "sclerophyllous_forests", "forests",  "natural_grasslands", "pastures", "urban", "agricultural_mosaic", "nonirrigated_arable_land", "permanently_irrigated_land", "permanent_crops", "ed", "pd", "shdi")]
 
+# CV
+sapply(pollen_change[, 4:17], function(x) mean(abs(x), na.rm = TRUE))
 
-# MODELOS ####
+# heat map
+pollen_change_long = pollen_change %>% pivot_longer(5:17, names_to='class', values_to = 'diff_area')
 
-# correlations
-data_trends = Δ_df %>%
-  pivot_longer(4:16, names_to='predictor', values_to='value') %>%
-  group_by(type, predictor) %>%
-  summarise({
-    if (sum(!is.na(Δ_polen) & !is.na(value)) > 2) {
-      test <- cor.test(Δ_polen, value, method="spearman")
-      data.frame(
-        rho = unname(test$estimate),
-        p.val = test$p.value
-      )
-    } else {
-      data.frame(rho = NA, p.val = NA)
-    }
-  }, .groups = "drop") %>%
+pollen_change_cor = pollen_change_long %>%
+  group_by(type, class) %>%
+  summarise(
+    rho = unname(cor.test(d_polen, diff_area, method="spearman")$estimate),
+    p.val = cor.test(d_polen, diff_area, method="spearman")$p.value) %>%
   mutate(sig = ifelse(p.val < 0.05, "sig.", "non sig."),
          label = ifelse(sig == "sig.", "***", "")
   )
 
-# 
-data_trends$predictor = factor(data_trends$predictor, levels=c("Δ_agricultural_mosaic", "Δ_forests","Δ_natural_grasslands","Δ_nonirrigated_arable_land","Δ_pastures","Δ_permanent_crops","Δ_permanently_irrigated_land", "Δ_sclerophyllous_forests", "Δ_shrubland", "Δ_urban",      "Δ_ed", "Δ_pd", "Δ_shdi"))
+pollen_change_cor$type = factor(pollen_change_cor$type, levels=rev(c("AMAR", "ARTE", "PLAN", "RUME", "URTI")))
+pollen_change_cor$class = factor(pollen_change_cor$class, levels=c("shrubland", "sclerophyllous_forests", "forests",  "natural_grasslands", "pastures", "urban", "agricultural_mosaic", "nonirrigated_arable_land", "permanently_irrigated_land", "permanent_crops", "ed", "pd", "shdi"))
 
-ggplot(data_trends, aes(x = predictor, y = type, fill = rho)) +
+ggplot(pollen_change_cor, aes(x = class, y = type, fill = rho)) +
   geom_tile(color = "white") +
   geom_text(aes(label = label), size = 3) +
   scale_fill_gradient2(
@@ -202,6 +164,6 @@ ggplot(data_trends, aes(x = predictor, y = type, fill = rho)) +
     panel.grid = element_blank(),
     strip.text = element_text(face = "bold")
   ) +
-  labs(fill = "rho", x = NULL, y = "Type")
+  labs(fill = "rho", x = NULL, y = "Pollen type")
 
 

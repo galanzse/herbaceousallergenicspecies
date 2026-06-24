@@ -19,12 +19,12 @@ climate$meteoval[climate$meteoval==0] <- NA
 
 
 # datos de polen
-fenofases <- read.csv("results/parametros.txt", sep="") %>%
+parametros <- read.csv("results/parametros.txt", sep="") %>%
   dplyr::select(type, site, method, seasons, st.jd, ln.ps, sm.tt)
-colnames(fenofases)[colnames(fenofases)=='seasons'] = 'year'
+colnames(parametros)[colnames(parametros)=='seasons'] = 'year'
 
 # unimos
-climatexpollen <- merge(climate, fenofases, by=c('site','year'))
+climatexpollen <- merge(climate, parametros, by=c('site','year'))
 
 # eliminamos temperaturas acumuladas
 climatexpollen <- climatexpollen[climatexpollen$meteo_sum %in% c('prec_t','tmed_m'),]
@@ -66,36 +66,6 @@ climate_trends = unique(climate_trends)
 climate_trends$rho[climate_trends$season=='SON' & climate_trends$fenofase=='SOP'] <- NA
 climate_trends$rho[climate_trends$season=='JJA' & climate_trends$fenofase=='SOP'] <- NA
 climate_trends = climate_trends %>% subset(climate_trends$season!='SON')
-
-# plots
-ggplot(aes(x=fenofase, y=rho, group=fenofase, colour=sig, shape=method),
-       data=climate_trends[climate_trends$meteo_sum=='tmed_m',]) +
-  geom_boxplot() +
-  geom_jitter(width=0.2, alpha=0.7, size=1.2) +
-  geom_hline(yintercept=0) +
-  facet_grid(season ~ type, scales = "free_x") +
-  labs(title='Seasonal daily mean temperature', y="Spearman's ρ", x=NULL) +
-  theme_bw() +
-  theme(legend.position='bottom') +
-  guides(
-    colour = guide_legend(nrow = 2),
-    shape  = guide_legend(nrow = 2)
-  )
-
-ggplot(aes(x=fenofase, y=rho, group=fenofase, colour=sig, shape=method),
-       data=climate_trends[climate_trends$meteo_sum=='prec_t',]) +
-  geom_boxplot() +
-  geom_jitter(width=0.2, alpha=0.7, size=1.2) +
-  geom_hline(yintercept=0) +
-  facet_grid(season ~ type, scales = "free_x") +
-  labs(title='Seasonal accumulated precipitation', y='Spearman ρ', x=NULL) +
-  theme_bw() +
-  theme(legend.position='bottom') +
-  guides(
-    colour = guide_legend(nrow = 2),
-    shape  = guide_legend(nrow = 2)
-  )
-
 
 # tabla
 temp = climate_trends[climate_trends$season=='DJF' & climate_trends$type=='URTI',]

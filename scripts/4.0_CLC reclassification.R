@@ -5,8 +5,8 @@ library(tidyverse)
 library(terra)
 library(readxl)
 
-# t0 = '/Users/jesusrojo/Library/CloudStorage/OneDrive-Personal/ACADEMICO/proyectos/fuentes_palinocam/data/CORINE_acc/'
-t0 = "C:/Users/javie/OneDrive/ACADEMICO/proyectos/fuentes_palinocam/data/CORINE_acc/"
+t0 = '/Users/jesusrojo/Library/CloudStorage/OneDrive-Personal/ACADEMICO/proyectos/fuentes_palinocam/data/CORINE_acc/'
+# t0 = "C:/Users/javie/OneDrive/ACADEMICO/proyectos/fuentes_palinocam/data/CORINE_acc/"
 CORINEacc = c(rast(paste0(t0, 'eea_r_3035_100_m_clc-2000-acc_p_1999-2001_v02_r00/CLC2000ACC_V2018_20.tif')),
               rast(paste0(t0, 'eea_r_3035_100_m_clc-2006-acc_p_2005-2007_v02_r00/CLC2006ACC_V2018_20.tif')),
               rast(paste0(t0, 'eea_r_3035_100_m_clc-2012-acc_p_2011-2013_v02_r00/CLC2012ACC_V2018_20.tif')),

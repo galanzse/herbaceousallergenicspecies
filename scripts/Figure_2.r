@@ -48,32 +48,3 @@ read.csv("results/parametros.txt", sep="") %>%
   as.data.frame()
 
 
-  
-# modelos
-mod_data = read.csv("results/fenofases.txt", sep="") %>%
-  dplyr::select(type, site, method, seasons, st.jd, ln.ps, sm.tt) %>%
-  subset(type!='ARTE' & method!='logistic')
-
-mod_data$type = as.factor(mod_data$type)
-mod_data$site = as.factor(mod_data$site)
-mod_data$method = as.factor(mod_data$method)
-mod_data$seasons <- as.numeric(mod_data$seasons)
-mod_data$st.jd = as.numeric(mod_data$st.jd)
-mod_data$ln.ps = as.numeric(mod_data$ln.ps)
-mod_data$sm.tt = as.numeric(mod_data$sm.tt)
-
-str(mod_data)
-
-mod <- lm(st.jd ~ type + site + method + seasons, data=mod_data)
-Anova(mod, type="II") 
-t = Anova(mod, type="II"); round(t$`Sum Sq`/sum(t$`Sum Sq`), 2)
-
-mod <- lm(ln.ps ~ type + site + method + seasons, data=mod_data)
-Anova(mod, type="II") 
-t = Anova(mod, type="II"); round(t$`Sum Sq`/sum(t$`Sum Sq`), 2)
-
-mod <- lm(sm.tt ~ type + site + method + seasons, data=mod_data)
-Anova(mod, type="II") 
-t = Anova(mod, type="II"); round(t$`Sum Sq`/sum(t$`Sum Sq`), 2)
-
-

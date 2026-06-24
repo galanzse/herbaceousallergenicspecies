@@ -19,7 +19,7 @@ source('scripts/4.0_CLC reclassification.r')
 
 
 # extraer datos para cada estacion, año y buffer
-buff_imp = expand_grid(site = unique(pollen$site),
+buff_imp = expand_grid(site = unique(pollen_stations$codigo),
                        año = c(2000, 2006, 2012, 2018),
                        buffer = c(5, 10, 15, 20))
 
