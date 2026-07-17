@@ -4,13 +4,13 @@
 
 source('scripts/4.1_sources.r')
 
-df <- lu_spatial_dif[,1:12]
-str(lu_spatial_dif)
+df <- sources[,1:12]
+str(df)
 
 # Convert to long format
 df_long <- df %>%
   pivot_longer(
-    cols = starts_with("a_"),
+    cols = 3:12,
     names_to = "landuse",
     values_to = "area"
   ) %>%
@@ -35,19 +35,6 @@ ggplot(df_long,
   
   theme_bw() +
   theme(legend.position = 'bottom') +
-  guides(fill=guide_legend(nrow=3, byrow=TRUE))
-
-
-# analisis NMDs
-
-CORINE_nmds = lu_spatial_dif[,1:12] %>% as.data.frame()
-rownames(CORINE_nmds) = paste0(CORINE_nmds$site, CORINE_nmds$año)
-CORINE_nmds$site = NULL
-CORINE_nmds$año = NULL
-
-nmds <- metaMDS(CORINE_nmds, distance="bray", k=2, trymax=100)
-plot(nmds, type = "n")
-orditorp(nmds, display = "sites", labels = rownames(CORINE_nmds), cex = 0.6)
-orditorp(nmds, display = "species", cex = 0.5, col = "blue")
+  guides(fill=guide_legend(nrow=4, byrow=TRUE))
 
 

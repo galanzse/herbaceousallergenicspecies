@@ -33,6 +33,8 @@ annual_pollen_summary2 <- parametros %>%
 
 annual_pollen_summary2$parameter = factor(annual_pollen_summary2$parameter, levels=c('SOP','LOP','APIn'))
 
+annual_pollen_summary2 = annual_pollen_summary2[!(annual_pollen_summary2$type=='ARTE' & annual_pollen_summary2$parameter%in%c('SOP','LOP')),]
+
 ggplot(aes(x=site, y=median, color=type, shape=type, group=type), data=annual_pollen_summary2) +
   geom_point(position=position_dodge(width = 0.7), size=1.3) +
   geom_errorbar(
